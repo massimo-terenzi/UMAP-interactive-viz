@@ -183,6 +183,7 @@
             font-size: 11px;
             color: #5f6368;
             display: none;
+            backdrop-filter: blur(4px);
         }
         
         .stats-content {
@@ -526,49 +527,17 @@
             transition: width 0.3s ease;
         }
         
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(255, 255, 255, 0.95);
-            border-top: 1px solid #e8eaed;
-            padding: 8px 16px;
-            font-size: 11px;
-            color: #5f6368;
-            text-align: center;
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-        }
-        
-        .footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-        
-        .disclaimer {
-            flex: 1;
-            text-align: left;
-        }
-        
-        .copyright {
-            flex-shrink: 0;
-            font-weight: 500;
-        }
-        
         @media (max-width: 768px) {
-            .footer-content {
+            .main-container {
                 flex-direction: column;
-                gap: 4px;
             }
             
-            .disclaimer {
-                text-align: center;
+            .visualization-panel {
+                flex: 0 0 60%;
+            }
+            
+            .analysis-panel {
+                flex: 0 0 40%;
             }
         }
     </style>
@@ -648,17 +617,6 @@
                         <div>Load your CSV file to begin data exploration</div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="footer">
-        <div class="footer-content">
-            <div class="disclaimer">
-                ⚡ This tool operates entirely in your browser - no data is sent to external servers
-            </div>
-            <div class="copyright">
-                © 2025 Massimo Terenzi - All rights reserved
             </div>
         </div>
     </div>
@@ -979,7 +937,7 @@
                     .style('text-anchor', 'middle')
                     .text('UMAP Dimension 2');
                 
-                // Data points
+                // Data points with dynamic radius based on zoom
                 const points = zoomGroup.selectAll('.point')
                     .data(dataset)
                     .enter()
@@ -987,7 +945,7 @@
                     .attr('class', 'point')
                     .attr('cx', d => xScale(d.UMAP1))
                     .attr('cy', d => yScale(d.UMAP2))
-                    .attr('r', 3)
+                    .attr('r', 3.5)
                     .attr('fill', d => colorScale(d.cluster))
                     .attr('stroke', 'white')
                     .attr('stroke-width', 0.5)
@@ -1013,14 +971,24 @@
                     const newXScale = transform.rescaleX(originalXScale);
                     const newYScale = transform.rescaleY(originalYScale);
                     
+                    // Calculate dynamic radius based on zoom level using logarithmic scaling
+                    const baseRadius = 3.5;
+                    const logFactor = Math.log(transform.k + 1) / Math.log(2); // Logarithmic scaling base 2
+                    const scalingIntensity = 0.3; // Lower value = slower growth
+                    const dynamicRadius = baseRadius + (logFactor * scalingIntensity);
+                    const minRadius = 2.0; // Minimum radius 
+                    const maxRadius = 8.0; // Maximum radius to prevent oversized points
+                    const finalRadius = Math.max(Math.min(dynamicRadius, maxRadius), minRadius);
+                    
                     // Update axes
                     xAxis.call(d3.axisBottom(newXScale).ticks(8));
                     yAxis.call(d3.axisLeft(newYScale).ticks(8));
                     
-                    // Update points
+                    // Update points with dynamic radius
                     points
                         .attr('cx', d => newXScale(d.UMAP1))
-                        .attr('cy', d => newYScale(d.UMAP2));
+                        .attr('cy', d => newYScale(d.UMAP2))
+                        .attr('r', finalRadius);
                 }
                 
                 // Zoom controls
@@ -1368,4 +1336,3 @@
     </script>
 </body>
 </html>
-                
