@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UMAP Clustering Analysis</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            height: 100vh;
+            background: #ffffff;
+            color: #2c3e50;
+            overflow: hidden;
+        }
+        
+        .main-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        .visualization-panel {
+            flex: 0 0 70%;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e8eaed;
+        }
+        
+        .analysis-panel {
+            flex: 0 0 30%;
+            display: flex;
+            flex-direction: column;
+            background: #fafbfc;
+        }
+        
+        .header {
+            padding: 24px 32px;
+            border-bottom: 1px solid #e8eaed;
+            background: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-content h1 {
+            font-size: 24px;
+            font-weight: 400;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        
+        .header-content .subtitle {
+            font-size: 14px;
+            color: #5f6368;
+            font-weight: 400;
+        }
+        
+        .file-loader {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-button {
+            background: #1a73e8;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        
+        .file-button:hover {
+            background: #1765cc;
+        }
+        
+        .file-button:disabled {
+            background: #9aa0a6;
+            cursor: not-allowed;
+        }
+        
+        .file-status {
+            font-size: 12px;
+            color: #5f6368;
+        }
+        
+        .plot-container {
+            flex: 1;
+            position: relative;
+            padding: 20px;
+            background: #ffffff;
+        }
+        
+        .plot-area {
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+        
+        .legend-container {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e8eaed;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            width: 220px;
+            display: none;
+        }
+        
+        .legend-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .legend-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 11px;
+            color: #5f6368;
+            padding: 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        
+        .legend-item:hover {
+            background-color: rgba(26, 115, 232, 0.1);
+            color: #1a73e8;
+        }
+        
+        .legend-item.active {
+            background-color: rgba(26, 115, 232, 0.15);
+            color: #1a73e8;
+            font-weight: 500;
+        }
+        
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 6px;
+            border: 1px solid rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+        
+        .stats-container {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e8eaed;
+            border-radius: 8px;
+            padding: 12px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 11px;
+            color: #5f6368;
+            display: none;
+        }
+        
+        .stats-content {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            white-space: nowrap;
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e8eaed;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: none;
+            flex-direction: row;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .zoom-button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .zoom-button:hover {
+            background: #1765cc;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .zoom-button:active {
+            transform: translateY(0);
+        }
+        
+        .zoom-button:disabled {
+            background: #9aa0a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .zoom-button.active {
+            background: #ea4335;
+        }
+        
+        .zoom-button.active:hover {
+            background: #d33b2c;
+        }
+        
+        .zoom-label {
+            font-size: 10px;
+            color: #5f6368;
+            margin: 0 4px;
+            white-space: nowrap;
+        }
+        
+        .point {
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .point:hover {
+            stroke-width: 2;
+            stroke: #1a73e8;
+        }
+        
+        .point.selected {
+            stroke-width: 3;
+            stroke: #ea4335;
+        }
+        
+        .analysis-header {
+            padding: 24px 24px 16px 24px;
+            background: #fafbfc;
+        }
+        
+        .analysis-header h2 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        
+        .analysis-header .description {
+            font-size: 13px;
+            color: #5f6368;
+        }
+        
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+            background: #fafbfc;
+        }
+        
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: #5f6368;
+            font-size: 16px;
+            padding: 40px;
+        }
+        
+        .welcome-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            opacity: 0.5;
+        }
+        
+        .welcome-title {
+            font-size: 20px;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+        
+        .welcome-text {
+            line-height: 1.6;
+            max-width: 400px;
+        }
+        
+        .no-selection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: #9aa0a6;
+            font-size: 14px;
+            padding: 40px;
+        }
+        
+        .no-selection-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .data-card {
+            margin: 24px;
+            background: #ffffff;
+            border: 1px solid #e8eaed;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        
+        .data-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .image-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            background: #f8f9fa;
+            overflow: hidden;
+        }
+        
+        .data-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #fafbfc;
+            transition: opacity 0.3s ease;
+        }
+        
+        .image-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: #5f6368;
+            font-size: 14px;
+        }
+        
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e8eaed;
+            border-top: 3px solid #1a73e8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .image-error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: #9aa0a6;
+            font-size: 12px;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .error-icon {
+            font-size: 24px;
+            opacity: 0.5;
+        }
+        
+        .card-content {
+            padding: 20px;
+        }
+        
+        .cluster-badge {
+            display: inline-block;
+            background: #e8f0fe;
+            color: #1a73e8;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        
+        .text-content {
+            font-size: 14px;
+            color: #3c4043;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+        
+        .description {
+            font-size: 13px;
+            color: #5f6368;
+            line-height: 1.4;
+            margin-bottom: 16px;
+            font-style: italic;
+        }
+        
+        .action-button {
+            display: inline-block;
+            background: #1a73e8;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        
+        .action-button:hover {
+            background: #1765cc;
+        }
+        
+        .axis-label {
+            font-size: 12px;
+            fill: #5f6368;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        .axis text {
+            font-size: 11px;
+            fill: #5f6368;
+        }
+        
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #e8eaed;
+            stroke-width: 1;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #5f6368;
+            font-size: 16px;
+            text-align: center;
+        }
+        
+        .error {
+            color: #ea4335;
+            background: #fce8e6;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px;
+            text-align: center;
+        }
+        
+        .progress-bar {
+            width: 200px;
+            height: 4px;
+            background: #e8eaed;
+            border-radius: 2px;
+            margin: 16px auto;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #1a73e8;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="visualization-panel">
+            <div class="header">
+                <div class="header-content">
+                    <h1>UMAP Dimensional Reduction Analysis</h1>
+                    <div class="subtitle">Load your CSV file to begin analysis</div>
+                </div>
+                
+                <div class="file-loader">
+                    <input type="file" id="csvFile" class="file-input" accept=".csv" />
+                    <button class="file-button" onclick="document.getElementById('csvFile').click()">
+                        📁 Load CSV File
+                    </button>
+                    <div class="file-status" id="fileStatus">No file selected</div>
+                </div>
+            </div>
+            
+            <div class="plot-container">
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="welcome-icon">📊</div>
+                    <div class="welcome-title">Welcome to UMAP Analysis</div>
+                    <div class="welcome-text">
+                        Click "Load CSV File" above to upload your merged_df_light.csv file and begin exploring your dimensional reduction visualization.
+                        <br><br>
+                        The system will automatically parse your data and create an interactive scatter plot with clustering analysis.
+                    </div>
+                </div>
+                
+                <div class="loading" id="loadingScreen" style="display: none;">
+                    <div>Processing your data...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div style="font-size: 12px; margin-top: 8px; color: #9aa0a6;" id="loadingText">
+                        Parsing CSV file...
+                    </div>
+                </div>
+                
+                <svg class="plot-area" style="display: none;"></svg>
+                
+                <div class="zoom-controls">
+                    <button class="zoom-button" id="panMode" title="Pan Mode (Move Around)">↔</button>
+                    <button class="zoom-button" id="zoomSelectMode" title="Zoom Selection Mode">⬚</button>
+                    <span class="zoom-label">|</span>
+                    <button class="zoom-button" id="zoomIn" title="Zoom In">+</button>
+                    <button class="zoom-button" id="zoomOut" title="Zoom Out">−</button>
+                    <span class="zoom-label">|</span>
+                    <button class="zoom-button" id="resetZoom" title="Fit All Data">⌂</button>
+                </div>
+                
+                <div class="legend-container">
+                    <div class="legend-title">Clusters</div>
+                    <div class="legend-grid" id="legend-items"></div>
+                </div>
+                
+                <div class="stats-container">
+                    <div class="stats-content" id="stats-content"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="analysis-panel">
+            <div class="analysis-header">
+                <h2>Data Point Analysis</h2>
+                <div class="description">Load data and select a point to view detailed information</div>
+            </div>
+            
+            <div class="content-area">
+                <div id="analysis-content">
+                    <div class="no-selection">
+                        <div class="no-selection-icon">📈</div>
+                        <div>Load your CSV file to begin data exploration</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDataset = null;
+        let activeClusters = new Set(); // Track which clusters are currently visible
+        let allPoints = null; // Store reference to all data points
+        let currentZoom = null; // Store zoom behavior
+        let currentMode = 'pan'; // 'pan' or 'select'
+        let selectionRect = null; // Store selection rectangle
+        
+        // File input handler
+        document.getElementById('csvFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                loadCSVFile(file);
+            }
+        });
+        
+        // Parse CSV data function - using Papa Parse for robust parsing
+        function parseCSVData(csvText) {
+            console.log('Starting Papa Parse...');
+            
+            // Use Papa Parse - much more robust for complex CSV files
+            const parseResult = Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: false, // Keep everything as strings initially
+                transformHeader: function(header) {
+                    // Clean header names
+                    return header.trim().replace(/"/g, '');
+                },
+                transform: function(value, header) {
+                    // Clean values
+                    return value ? value.trim() : '';
+                }
+            });
+            
+            console.log('Papa Parse result:', parseResult);
+            console.log('Errors:', parseResult.errors);
+            console.log('Raw data length:', parseResult.data.length);
+            
+            if (parseResult.errors.length > 0) {
+                console.warn('Parse errors:', parseResult.errors);
+            }
+            
+            const data = [];
+            
+            parseResult.data.forEach((row, index) => {
+                try {
+                    // Check if row has required columns
+                    if (!row.hasOwnProperty('cluster') || !row.hasOwnProperty('UMAP1') || !row.hasOwnProperty('UMAP2')) {
+                        if (index < 5) { // Only log first few to avoid spam
+                            console.warn(`Row ${index}: Missing required columns:`, Object.keys(row));
+                        }
+                        return;
+                    }
+                    
+                    // Convert numeric fields
+                    const cluster = parseFloat(row.cluster);
+                    const umap1 = parseFloat(row.UMAP1);
+                    const umap2 = parseFloat(row.UMAP2);
+                    
+                    // Validate numeric values
+                    if (isNaN(cluster) || isNaN(umap1) || isNaN(umap2)) {
+                        if (index < 5) { // Only log first few
+                            console.warn(`Row ${index}: Invalid numeric values - cluster: ${row.cluster}, UMAP1: ${row.UMAP1}, UMAP2: ${row.UMAP2}`);
+                        }
+                        return;
+                    }
+                    
+                    // Filter out noise points (cluster 0)
+                    if (cluster === 0) {
+                        return;
+                    }
+                    
+                    // Create clean data object
+                    const cleanRow = {
+                        nome_file: row.nome_file || '',
+                        url_file: row.url_file || '',
+                        text_associato: row.text_associato || '',
+                        description: row.description || '',
+                        full_text: row.full_text || '',
+                        cluster: cluster,
+                        UMAP1: umap1,
+                        UMAP2: umap2
+                    };
+                    
+                    data.push(cleanRow);
+                    
+                } catch (error) {
+                    if (index < 10) { // Only log first few errors
+                        console.warn(`Error processing row ${index}:`, error, row);
+                    }
+                }
+                
+                // Update progress periodically
+                if (index % 500 === 0) {
+                    const progress = (index / parseResult.data.length) * 50;
+                    updateProgress(progress, `Processing row ${index}/${parseResult.data.length}...`);
+                }
+            });
+            
+            console.log(`Successfully parsed ${data.length} valid data points from ${parseResult.data.length} total rows`);
+            return data;
+        }
+        
+        // Load and process CSV file
+        async function loadCSVFile(file) {
+            try {
+                // Show loading screen
+                document.getElementById('welcomeScreen').style.display = 'none';
+                document.getElementById('loadingScreen').style.display = 'block';
+                document.getElementById('fileStatus').textContent = `Loading: ${file.name}`;
+                
+                updateProgress(10, 'Reading file...');
+                
+                // Read file
+                const csvText = await file.text();
+                console.log('File loaded, size:', csvText.length, 'characters');
+                console.log('First 500 characters:', csvText.substring(0, 500));
+                
+                updateProgress(30, 'Parsing CSV data...');
+                
+                // Parse data
+                const dataset = parseCSVData(csvText);
+                console.log('Dataset parsed:', dataset.length, 'data points');
+                
+                if (dataset.length === 0) {
+                    throw new Error('No valid data points found. Please check your CSV format.');
+                }
+                
+                // Validate UMAP data
+                const validUMAP = dataset.filter(d => 
+                    !isNaN(d.UMAP1) && !isNaN(d.UMAP2) && 
+                    isFinite(d.UMAP1) && isFinite(d.UMAP2)
+                );
+                
+                console.log('Valid UMAP points:', validUMAP.length);
+                
+                if (validUMAP.length === 0) {
+                    throw new Error('No valid UMAP coordinates found. Check UMAP1 and UMAP2 columns.');
+                }
+                
+                updateProgress(80, 'Creating visualization...');
+                
+                // Store dataset
+                currentDataset = validUMAP;
+                
+                // Create visualization
+                await createVisualization(validUMAP);
+                
+                updateProgress(100, 'Complete!');
+                
+                // Hide loading after short delay
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    document.querySelector('.plot-area').style.display = 'block';
+                    document.querySelector('.legend-container').style.display = 'block';
+                    document.querySelector('.stats-container').style.display = 'block';
+                    document.querySelector('.zoom-controls').style.display = 'flex';
+                }, 500);
+                
+                // Update file status
+                document.getElementById('fileStatus').textContent = `✅ ${validUMAP.length} data points loaded`;
+                document.querySelector('.subtitle').textContent = 
+                    `Interactive visualization: ${validUMAP.length.toLocaleString()} data points across ${[...new Set(validUMAP.map(d => d.cluster))].length} clusters`;
+                
+                // Update analysis panel
+                document.getElementById('analysis-content').innerHTML = `
+                    <div class="no-selection">
+                        <div class="no-selection-icon">📊</div>
+                        <div>Click on any data point in the visualization to begin analysis</div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Error processing file:', error);
+                document.getElementById('loadingScreen').innerHTML = `
+                    <div class="error">
+                        <strong>Error processing file:</strong><br>
+                        ${error.message}<br><br>
+                        <strong>Debug info:</strong><br>
+                        <small>Check the browser console (F12) for detailed logs</small><br><br>
+                        <strong>CSV Requirements:</strong><br>
+                        • Must have columns: cluster, UMAP1, UMAP2<br>
+                        • UMAP1 and UMAP2 must be numeric<br>
+                        • Cluster values should be non-zero integers
+                    </div>
+                `;
+                document.getElementById('fileStatus').textContent = '❌ Error loading file';
+            }
+        }
+        
+        // Update progress bar
+        function updateProgress(percent, text) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('loadingText').textContent = text;
+        }
+        
+        // Main visualization function
+        async function createVisualization(dataset) {
+            try {
+                console.log('Creating visualization with dataset:', dataset.length, 'points');
+                
+                if (!dataset || dataset.length === 0) {
+                    throw new Error('No data provided for visualization');
+                }
+                
+                // Validate data structure
+                const firstPoint = dataset[0];
+                console.log('First data point:', firstPoint);
+                
+                if (!firstPoint.hasOwnProperty('UMAP1') || !firstPoint.hasOwnProperty('UMAP2')) {
+                    throw new Error('Missing UMAP1 or UMAP2 columns in data');
+                }
+                
+                // Dimensions
+                const container = document.querySelector('.plot-container');
+                const containerRect = container.getBoundingClientRect();
+                const margin = { top: 40, right: 40, bottom: 60, left: 80 };
+                const width = containerRect.width - margin.left - margin.right - 300;
+                const height = containerRect.height - margin.top - margin.bottom - 100;
+                
+                console.log('Plot dimensions:', width, 'x', height);
+                
+                // SVG setup
+                const svg = d3.select('.plot-area')
+                    .attr('width', containerRect.width)
+                    .attr('height', containerRect.height);
+                    
+                svg.selectAll("*").remove(); // Clear previous content
+                
+                // Add zoom behavior
+                const zoom = d3.zoom()
+                    .scaleExtent([0.1, 10])
+                    .on("zoom", zoomed);
+                
+                currentZoom = zoom;
+                
+                // Initially set to pan mode
+                svg.call(zoom);
+                    
+                const plotGroup = svg.append('g')
+                    .attr('transform', `translate(${margin.left},${margin.top})`);
+                
+                const zoomGroup = plotGroup.append('g');
+                
+                // Add selection overlay (initially hidden)
+                const selectionOverlay = svg.append('rect')
+                    .attr('class', 'selection-overlay')
+                    .style('fill', 'rgba(26, 115, 232, 0.1)')
+                    .style('stroke', '#1a73e8')
+                    .style('stroke-width', 1)
+                    .style('stroke-dasharray', '5,5')
+                    .style('display', 'none');
+                
+                // Scales
+                const xExtent = d3.extent(dataset, d => d.UMAP1);
+                const yExtent = d3.extent(dataset, d => d.UMAP2);
+                
+                console.log('UMAP1 extent:', xExtent);
+                console.log('UMAP2 extent:', yExtent);
+                
+                if (!xExtent[0] && xExtent[0] !== 0 || !xExtent[1] && xExtent[1] !== 0) {
+                    throw new Error('Invalid UMAP1 data range');
+                }
+                
+                if (!yExtent[0] && yExtent[0] !== 0 || !yExtent[1] && yExtent[1] !== 0) {
+                    throw new Error('Invalid UMAP2 data range');
+                }
+                
+                const xScale = d3.scaleLinear()
+                    .domain(xExtent)
+                    .range([0, width])
+                    .nice();
+                    
+                const yScale = d3.scaleLinear()
+                    .domain(yExtent)
+                    .range([height, 0])
+                    .nice();
+                
+                // Store original scales for reset
+                const originalXScale = xScale.copy();
+                const originalYScale = yScale.copy();
+                
+                // Color scheme
+                const clusters = [...new Set(dataset.map(d => d.cluster))].filter(c => !isNaN(c)).sort((a,b) => a-b);
+                console.log('Clusters found:', clusters);
+                
+                const colorScale = d3.scaleOrdinal()
+                    .domain(clusters)
+                    .range(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5', '#c49c94', '#f7b6d3']);
+                
+                // Axes
+                const xAxis = plotGroup.append('g')
+                    .attr('class', 'axis')
+                    .attr('transform', `translate(0,${height})`)
+                    .call(d3.axisBottom(xScale).ticks(8));
+                    
+                xAxis.append('text')
+                    .attr('class', 'axis-label')
+                    .attr('x', width/2)
+                    .attr('y', 40)
+                    .style('text-anchor', 'middle')
+                    .text('UMAP Dimension 1');
+                    
+                const yAxis = plotGroup.append('g')
+                    .attr('class', 'axis')
+                    .call(d3.axisLeft(yScale).ticks(8));
+                    
+                yAxis.append('text')
+                    .attr('class', 'axis-label')
+                    .attr('transform', 'rotate(-90)')
+                    .attr('y', -50)
+                    .attr('x', -height/2)
+                    .style('text-anchor', 'middle')
+                    .text('UMAP Dimension 2');
+                
+                // Data points
+                const points = zoomGroup.selectAll('.point')
+                    .data(dataset)
+                    .enter()
+                    .append('circle')
+                    .attr('class', 'point')
+                    .attr('cx', d => xScale(d.UMAP1))
+                    .attr('cy', d => yScale(d.UMAP2))
+                    .attr('r', 3)
+                    .attr('fill', d => colorScale(d.cluster))
+                    .attr('stroke', 'white')
+                    .attr('stroke-width', 0.5)
+                    .attr('opacity', 0.8);
+                
+                // Store reference to all points for filtering
+                allPoints = points;
+                
+                console.log('Created', points.size(), 'data points');
+                
+                // Interaction
+                points.on('click', function(event, d) {
+                    points.classed('selected', false);
+                    d3.select(this).classed('selected', true);
+                    updateAnalysisPanel(d);
+                });
+                
+                // Zoom functions
+                function zoomed(event) {
+                    const { transform } = event;
+                    
+                    // Update scales
+                    const newXScale = transform.rescaleX(originalXScale);
+                    const newYScale = transform.rescaleY(originalYScale);
+                    
+                    // Update axes
+                    xAxis.call(d3.axisBottom(newXScale).ticks(8));
+                    yAxis.call(d3.axisLeft(newYScale).ticks(8));
+                    
+                    // Update points
+                    points
+                        .attr('cx', d => newXScale(d.UMAP1))
+                        .attr('cy', d => newYScale(d.UMAP2));
+                }
+                
+                // Zoom controls
+                document.getElementById('panMode').onclick = () => {
+                    setMode('pan');
+                };
+                
+                document.getElementById('zoomSelectMode').onclick = () => {
+                    setMode('select');
+                };
+                
+                document.getElementById('zoomIn').onclick = () => {
+                    svg.transition().duration(300).call(zoom.scaleBy, 1.5);
+                };
+                
+                document.getElementById('zoomOut').onclick = () => {
+                    svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
+                };
+                
+                document.getElementById('resetZoom').onclick = () => {
+                    svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+                };
+                
+                // Initialize mode
+                setMode('pan');
+                
+                // Mode switching function
+                function setMode(mode) {
+                    currentMode = mode;
+                    
+                    // Update button states
+                    document.getElementById('panMode').classList.toggle('active', mode === 'pan');
+                    document.getElementById('zoomSelectMode').classList.toggle('active', mode === 'select');
+                    
+                    if (mode === 'pan') {
+                        // Enable zoom/pan
+                        svg.call(zoom);
+                        svg.style('cursor', 'grab');
+                        
+                        // Remove selection handlers
+                        svg.on('.selection', null);
+                        
+                    } else if (mode === 'select') {
+                        // Disable zoom/pan
+                        svg.on('.zoom', null);
+                        svg.style('cursor', 'crosshair');
+                        
+                        // Add selection handlers
+                        let startX, startY, isSelecting = false;
+                        
+                        svg.on('mousedown.selection', function(event) {
+                            isSelecting = true;
+                            const [x, y] = d3.pointer(event);
+                            startX = x;
+                            startY = y;
+                            
+                            selectionOverlay
+                                .attr('x', x)
+                                .attr('y', y)
+                                .attr('width', 0)
+                                .attr('height', 0)
+                                .style('display', 'block');
+                        });
+                        
+                        svg.on('mousemove.selection', function(event) {
+                            if (!isSelecting) return;
+                            
+                            const [currentX, currentY] = d3.pointer(event);
+                            const x = Math.min(startX, currentX);
+                            const y = Math.min(startY, currentY);
+                            const width = Math.abs(currentX - startX);
+                            const height = Math.abs(currentY - startY);
+                            
+                            selectionOverlay
+                                .attr('x', x)
+                                .attr('y', y)
+                                .attr('width', width)
+                                .attr('height', height);
+                        });
+                        
+                        svg.on('mouseup.selection', function(event) {
+                            if (!isSelecting) return;
+                            isSelecting = false;
+                            
+                            const [endX, endY] = d3.pointer(event);
+                            selectionOverlay.style('display', 'none');
+                            
+                            // Calculate zoom to selection
+                            const x1 = Math.min(startX, endX);
+                            const y1 = Math.min(startY, endY);
+                            const x2 = Math.max(startX, endX);
+                            const y2 = Math.max(startY, endY);
+                            
+                            // Only zoom if selection is big enough
+                            if (Math.abs(x2 - x1) > 10 && Math.abs(y2 - y1) > 10) {
+                                zoomToSelection(x1, y1, x2, y2);
+                            }
+                        });
+                    }
+                }
+                
+                // Function to zoom to selection
+                function zoomToSelection(x1, y1, x2, y2) {
+                    // Get current transform
+                    const currentTransform = d3.zoomTransform(svg.node());
+                    
+                    // Convert screen coordinates to plot coordinates (accounting for current transform)
+                    const plotX1 = (x1 - margin.left - currentTransform.x) / currentTransform.k;
+                    const plotY1 = (y1 - margin.top - currentTransform.y) / currentTransform.k;
+                    const plotX2 = (x2 - margin.left - currentTransform.x) / currentTransform.k;
+                    const plotY2 = (y2 - margin.top - currentTransform.y) / currentTransform.k;
+                    
+                    // Calculate selection dimensions in plot space
+                    const selectionWidth = Math.abs(plotX2 - plotX1);
+                    const selectionHeight = Math.abs(plotY2 - plotY1);
+                    
+                    // Calculate center of selection
+                    const centerX = (plotX1 + plotX2) / 2;
+                    const centerY = (plotY1 + plotY2) / 2;
+                    
+                    // Calculate scale needed to fit selection in view
+                    const scaleX = width / selectionWidth;
+                    const scaleY = height / selectionHeight;
+                    const newScale = Math.min(scaleX, scaleY) * 0.9; // 0.9 for some padding
+                    
+                    // Calculate translation to center the selection
+                    const translateX = width / 2 - centerX * newScale;
+                    const translateY = height / 2 - centerY * newScale;
+                    
+                    // Create and apply the transform
+                    const transform = d3.zoomIdentity
+                        .translate(translateX, translateY)
+                        .scale(newScale);
+                    
+                    // Switch back to pan mode and apply zoom
+                    setMode('pan');
+                    svg.transition().duration(500).call(zoom.transform, transform);
+                }
+                
+                // Legend with 2 columns and click functionality
+                const legendContainer = d3.select('#legend-items');
+                legendContainer.selectAll('*').remove();
+                clusters.forEach(cluster => {
+                    const item = legendContainer.append('div')
+                        .attr('class', 'legend-item')
+                        .attr('data-cluster', cluster)
+                        .style('cursor', 'pointer');
+                    
+                    item.append('div')
+                        .attr('class', 'legend-color')
+                        .style('background-color', colorScale(cluster));
+                    
+                    item.append('span').text(`Cluster ${cluster}`);
+                    
+                    // Add click handler for cluster filtering
+                    item.on('click', function() {
+                        const clusterNum = parseInt(this.getAttribute('data-cluster'));
+                        toggleClusterVisibility(clusterNum);
+                    });
+                });
+                
+                // Statistics - single line
+                document.getElementById('stats-content').innerHTML = `
+                    <strong>Dataset Overview</strong>
+                    <span>Data points: ${dataset.length.toLocaleString()}</span>
+                    <span>Clusters: ${clusters.length}</span>
+                    <span>UMAP1: [${xExtent[0].toFixed(2)}, ${xExtent[1].toFixed(2)}]</span>
+                    <span>UMAP2: [${yExtent[0].toFixed(2)}, ${yExtent[1].toFixed(2)}]</span>
+                `;
+                
+                console.log('Visualization created successfully');
+                
+            } catch (error) {
+                console.error('Visualization error:', error);
+                throw error;
+            }
+        }
+        
+        function updateAnalysisPanel(dataPoint) {
+            const id = dataPoint.url_file.match(/id=([^&]+)/)?.[1];
+            const imageUrls = [
+                `https://drive.google.com/uc?export=view&id=${id}`,
+                `https://lh3.googleusercontent.com/d/${id}`
+            ];
+            
+            const analysisContent = document.getElementById('analysis-content');
+            analysisContent.innerHTML = `
+                <div class="data-card">
+                    <div class="image-container">
+                        <div class="image-loading">
+                            <div class="loading-spinner"></div>
+                            <div>Loading image...</div>
+                        </div>
+                        <img class="data-image" 
+                             style="opacity: 0;"
+                             alt="Data point visualization">
+                    </div>
+                    <div class="card-content">
+                        <div class="cluster-badge">Cluster ${dataPoint.cluster}</div>
+                        <div class="text-content">${dataPoint.text_associato || 'No text content available'}</div>
+                        <div class="description">${dataPoint.description || 'No description available'}</div>
+                        <a href="${dataPoint.url_file}" target="_blank" class="action-button">
+                            View Original Image
+                        </a>
+                    </div>
+                </div>
+            `;
+            
+            // Get the image element and loading indicator
+            const imgElement = analysisContent.querySelector('.data-image');
+            const loadingElement = analysisContent.querySelector('.image-loading');
+            const imageContainer = analysisContent.querySelector('.image-container');
+            
+            let currentUrlIndex = 0;
+            
+            function tryLoadImage() {
+                if (currentUrlIndex >= imageUrls.length) {
+                    // All URLs failed, show error
+                    loadingElement.style.display = 'none';
+                    imageContainer.innerHTML += `
+                        <div class="image-error">
+                            <div class="error-icon">🖼️</div>
+                            <div>Image not available</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                imgElement.onload = function() {
+                    // Image loaded successfully
+                    loadingElement.style.display = 'none';
+                    imgElement.style.opacity = '1';
+                };
+                
+                imgElement.onerror = function() {
+                    // Current URL failed, try next one
+                    currentUrlIndex++;
+                    if (currentUrlIndex < imageUrls.length) {
+                        imgElement.src = imageUrls[currentUrlIndex];
+                    } else {
+                        tryLoadImage(); // This will show the error message
+                    }
+                };
+                
+                // Start loading the image
+                imgElement.src = imageUrls[currentUrlIndex];
+            }
+            
+            // Start the loading process
+            tryLoadImage();
+        }
+        
+        // Function to toggle cluster visibility
+        function toggleClusterVisibility(clusterNum) {
+            const legendItem = document.querySelector(`[data-cluster="${clusterNum}"]`);
+            
+            if (activeClusters.has(clusterNum)) {
+                // Cluster is currently isolated, show all clusters
+                activeClusters.clear();
+                
+                // Show all points
+                if (allPoints) {
+                    allPoints
+                        .style('opacity', 0.8)
+                        .style('display', 'block');
+                }
+                
+                // Remove active class from all legend items
+                document.querySelectorAll('.legend-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+            } else {
+                // Hide all points except this cluster
+                activeClusters.clear();
+                activeClusters.add(clusterNum);
+                
+                // Update point visibility
+                if (allPoints) {
+                    allPoints.each(function(d) {
+                        const point = d3.select(this);
+                        if (d.cluster === clusterNum) {
+                            point.style('opacity', 0.8).style('display', 'block');
+                        } else {
+                            point.style('opacity', 0.1).style('display', 'block');
+                        }
+                    });
+                }
+                
+                // Update legend item states
+                document.querySelectorAll('.legend-item').forEach(item => {
+                    const itemCluster = parseInt(item.getAttribute('data-cluster'));
+                    if (itemCluster === clusterNum) {
+                        item.classList.add('active');
+                    } else {
+                        item.classList.remove('active');
+                    }
+                });
+            }
+            
+            // Update stats to reflect visible points
+            updateStatsDisplay();
+        }
+        
+        // Function to update stats display based on visible clusters
+        function updateStatsDisplay() {
+            if (!currentDataset) return;
+            
+            let visibleData, visibleClusters;
+            
+            if (activeClusters.size === 0) {
+                // All clusters visible
+                visibleData = currentDataset;
+                visibleClusters = [...new Set(currentDataset.map(d => d.cluster))];
+            } else {
+                // Only specific clusters visible
+                visibleData = currentDataset.filter(d => activeClusters.has(d.cluster));
+                visibleClusters = [...activeClusters];
+            }
+            
+            const xExtent = d3.extent(visibleData, d => d.UMAP1);
+            const yExtent = d3.extent(visibleData, d => d.UMAP2);
+            
+            const statsText = activeClusters.size === 0 ? 
+                `<strong>Dataset Overview</strong>
+                 <span>Data points: ${visibleData.length.toLocaleString()}</span>
+                 <span>Clusters: ${visibleClusters.length}</span>
+                 <span>UMAP1: [${xExtent[0].toFixed(2)}, ${xExtent[1].toFixed(2)}]</span>
+                 <span>UMAP2: [${yExtent[0].toFixed(2)}, ${yExtent[1].toFixed(2)}]</span>` :
+                `<strong>Filtered View</strong>
+                 <span>Cluster ${[...activeClusters].join(', ')}</span>
+                 <span>Data points: ${visibleData.length.toLocaleString()}</span>
+                 <span>UMAP1: [${xExtent[0].toFixed(2)}, ${xExtent[1].toFixed(2)}]</span>
+                 <span>UMAP2: [${yExtent[0].toFixed(2)}, ${yExtent[1].toFixed(2)}]</span>`;
+            
+            document.getElementById('stats-content').innerHTML = statsText;
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (currentDataset && document.querySelector('.plot-area').style.display !== 'none') {
+                setTimeout(() => createVisualization(currentDataset), 100);
+            }
+        });
+    </script>
+</body>
+</html>
+                
