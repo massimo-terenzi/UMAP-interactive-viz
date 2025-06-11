@@ -2,9 +2,7 @@
 
 An interactive web tool for exploring UMAP (Uniform Manifold Approximation and Projection) results with advanced clustering and data analysis features.
 
-## 🚀 Live Demo
-
-Try the tool: `https://massimo-terenzi.github.io/umap-interactive-viz`
+The tool is available here: `https://massimo-terenzi.github.io/umap-interactive-viz`
 
 ## ✨ Key Features
 
