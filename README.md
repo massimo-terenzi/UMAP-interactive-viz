@@ -57,6 +57,11 @@ The tool is available here: [https://massimo-terenzi.github.io/UMAP-interactive-
 Your CSV file must contain these columns:
 
 ```csv
-cluster,UMAP1,UMAP2,nome_file,url_file,text_associato,description
+cluster,UMAP1,UMAP2,file_name,file_url,post_text,description
 1,2.34,-1.56,image1.jpg,https://drive.google.com/file/d/ID/view,Sample text,Detailed description
 2,0.12,3.45,image2.jpg,https://drive.google.com/file/d/ID/view,Another text,Another description
+```
+- `filename` *(optional)*: name of the image file  
+- `file_url`: full URL to the image file (e.g., Google Drive link)  
+- `post_text`: original text associated with the post  
+- `description`: detailed or connotative description of the image
