@@ -1,6 +1,6 @@
 # UMAP Interactive Visualization Tool
 
-An interactive web tool for exploring UMAP (Uniform Manifold Approximation and Projection) results with advanced clustering and data analysis features.
+An interactive web tool for exploring UMAP (Uniform Manifold Approximation and Projection) results with advanced clustering and data analysis features. This tool provides an interactive web interface for visualizing clustered datasets reduced via UMAP, using .csv files that include coordinate data, image URLs, associated texts, and optional connotative descriptions. It is designed to support the qualitative inspection of results from unsupervised clustering workflows, particularly in contexts where semantic and visual patterns are central to the analysis.
 
 The tool is available here: [https://massimo-terenzi.github.io/UMAP-interactive-viz](https://massimo-terenzi.github.io/UMAP-interactive-viz/)
 
@@ -61,6 +61,8 @@ cluster,UMAP1,UMAP2,file_name,file_url,post_text,description
 1,2.34,-1.56,image1.jpg,https://drive.google.com/file/d/ID/view,Sample text,Detailed description
 2,0.12,3.45,image2.jpg,https://drive.google.com/file/d/ID/view,Another text,Another description
 ```
+- `cluster`: numeric label assigned by the clustering algorithm (e.g., HDBSCAN); groups semantically similar images together  
+- `UMAP1`, `UMAP2`: coordinates of the image in 2D UMAP space; used for visualizing the embedding layout
 - `filename` *(optional)*: name of the image file  
 - `file_url`: full URL to the image file (e.g., Google Drive link)  
 - `post_text`: original text associated with the post  
