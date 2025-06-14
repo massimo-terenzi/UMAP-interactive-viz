@@ -696,9 +696,9 @@
                     
                     // Create clean data object
                     const cleanRow = {
-                        file_name: row.file_name || '',
-                        file_url: row.file_url || '',
-                        post_text: row.post_text || '',
+                        nome_file: row.nome_file || '',
+                        url_file: row.url_file || '',
+                        text_associato: row.text_associato || '',
                         description: row.description || '',
                         full_text: row.full_text || '',
                         cluster: cluster,
@@ -1168,7 +1168,7 @@
         }
         
         function updateAnalysisPanel(dataPoint) {
-            const id = dataPoint.file_url.match(/id=([^&]+)/)?.[1];
+            const id = dataPoint.url_file.match(/id=([^&]+)/)?.[1];
             const imageUrls = [
                 `https://drive.google.com/uc?export=view&id=${id}`,
                 `https://lh3.googleusercontent.com/d/${id}`
@@ -1188,9 +1188,9 @@
                     </div>
                     <div class="card-content">
                         <div class="cluster-badge">Cluster ${dataPoint.cluster}</div>
-                        <div class="text-content">${dataPoint.post_text || 'No text content available'}</div>
+                        <div class="text-content">${dataPoint.text_associato || 'No text content available'}</div>
                         <div class="description">${dataPoint.description || 'No description available'}</div>
-                        <a href="${dataPoint.file_url}" target="_blank" class="action-button">
+                        <a href="${dataPoint.url_file}" target="_blank" class="action-button">
                             View Original Image
                         </a>
                     </div>
