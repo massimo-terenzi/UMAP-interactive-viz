@@ -64,5 +64,5 @@ cluster,UMAP1,UMAP2,file_url,post_text,description
 - `cluster`: numeric label assigned by the clustering algorithm (e.g., HDBSCAN); groups semantically similar images together  
 - `UMAP1`, `UMAP2`: coordinates of the image in 2D UMAP space; used for visualizing the embedding layout
 - `file_url`: full URL to the image file (e.g., Google Drive link)  
-- `text`: original text associated with the post  
-- `description`: additional description of the image
+- `text` (optional): original text associated with the post  
+- `description` (optional): additional description of the image
