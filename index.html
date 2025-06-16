@@ -567,7 +567,8 @@
                     <div class="welcome-text">
                         Click "Load CSV File" above to upload your .csv file and begin exploring your dimensional reduction visualization.
                         <br><br>
-                        The system will automatically parse your data and create an interactive scatter plot with clustering analysis.
+                        <strong>Required columns:</strong> cluster, UMAP1, UMAP2, file_url<br>
+                        <strong>Optional columns:</strong> text, description
                     </div>
                 </div>
                 
@@ -657,6 +658,7 @@
             });
             
             console.log('Papa Parse result:', parseResult);
+            console.log('Headers found:', parseResult.meta.fields);
             console.log('Errors:', parseResult.errors);
             console.log('Raw data length:', parseResult.data.length);
             
@@ -664,27 +666,63 @@
                 console.warn('Parse errors:', parseResult.errors);
             }
             
+            // Check for required columns with flexible naming
+            const headers = parseResult.meta.fields || [];
+            const requiredColumns = ['cluster', 'UMAP1', 'UMAP2', 'file_url'];
+            const optionalColumns = ['text', 'description'];
+            
+            // Find the actual column names (case insensitive)
+            const columnMap = {};
+            const availableColumns = [];
+            
+            requiredColumns.forEach(required => {
+                const found = headers.find(h => h.toLowerCase() === required.toLowerCase());
+                if (found) {
+                    columnMap[required] = found;
+                    availableColumns.push(required);
+                } else {
+                    // Also check for common variations
+                    if (required === 'file_url') {
+                        const urlVariations = ['url_file', 'url', 'file_url', 'image_url'];
+                        const foundUrl = headers.find(h => urlVariations.includes(h.toLowerCase()));
+                        if (foundUrl) {
+                            columnMap[required] = foundUrl;
+                            availableColumns.push(required);
+                        }
+                    }
+                }
+            });
+            
+            optionalColumns.forEach(optional => {
+                const found = headers.find(h => h.toLowerCase() === optional.toLowerCase());
+                if (found) {
+                    columnMap[optional] = found;
+                    availableColumns.push(optional);
+                }
+            });
+            
+            console.log('Column mapping:', columnMap);
+            console.log('Available columns:', availableColumns);
+            
+            // Check if we have all required columns
+            const missingRequired = requiredColumns.filter(col => !columnMap[col]);
+            if (missingRequired.length > 0) {
+                throw new Error(`Missing required columns: ${missingRequired.join(', ')}. Found columns: ${headers.join(', ')}`);
+            }
+            
             const data = [];
             
             parseResult.data.forEach((row, index) => {
                 try {
-                    // Check if row has required columns
-                    if (!row.hasOwnProperty('cluster') || !row.hasOwnProperty('UMAP1') || !row.hasOwnProperty('UMAP2')) {
-                        if (index < 5) { // Only log first few to avoid spam
-                            console.warn(`Row ${index}: Missing required columns:`, Object.keys(row));
-                        }
-                        return;
-                    }
-                    
-                    // Convert numeric fields
-                    const cluster = parseFloat(row.cluster);
-                    const umap1 = parseFloat(row.UMAP1);
-                    const umap2 = parseFloat(row.UMAP2);
+                    // Convert numeric fields using the mapped column names
+                    const cluster = parseFloat(row[columnMap.cluster]);
+                    const umap1 = parseFloat(row[columnMap.UMAP1]);
+                    const umap2 = parseFloat(row[columnMap.UMAP2]);
                     
                     // Validate numeric values
                     if (isNaN(cluster) || isNaN(umap1) || isNaN(umap2)) {
                         if (index < 5) { // Only log first few
-                            console.warn(`Row ${index}: Invalid numeric values - cluster: ${row.cluster}, UMAP1: ${row.UMAP1}, UMAP2: ${row.UMAP2}`);
+                            console.warn(`Row ${index}: Invalid numeric values - cluster: ${row[columnMap.cluster]}, UMAP1: ${row[columnMap.UMAP1]}, UMAP2: ${row[columnMap.UMAP2]}`);
                         }
                         return;
                     }
@@ -694,17 +732,21 @@
                         return;
                     }
                     
-                    // Create clean data object
+                    // Create clean data object with flexible columns
                     const cleanRow = {
-                        nome_file: row.nome_file || '',
-                        url_file: row.url_file || '',
-                        text_associato: row.text_associato || '',
-                        description: row.description || '',
-                        full_text: row.full_text || '',
                         cluster: cluster,
                         UMAP1: umap1,
-                        UMAP2: umap2
+                        UMAP2: umap2,
+                        file_url: row[columnMap.file_url] || ''
                     };
+                    
+                    // Add optional columns if they exist
+                    if (columnMap.text) {
+                        cleanRow.text = row[columnMap.text] || '';
+                    }
+                    if (columnMap.description) {
+                        cleanRow.description = row[columnMap.description] || '';
+                    }
                     
                     data.push(cleanRow);
                     
@@ -803,7 +845,8 @@
                         <strong>Debug info:</strong><br>
                         <small>Check the browser console (F12) for detailed logs</small><br><br>
                         <strong>CSV Requirements:</strong><br>
-                        • Must have columns: cluster, UMAP1, UMAP2<br>
+                        • Required columns: cluster, UMAP1, UMAP2, file_url<br>
+                        • Optional columns: text, description<br>
                         • UMAP1 and UMAP2 must be numeric<br>
                         • Cluster values should be non-zero integers
                     </div>
@@ -1168,77 +1211,115 @@
         }
         
         function updateAnalysisPanel(dataPoint) {
-            const id = dataPoint.url_file.match(/id=([^&]+)/)?.[1];
-            const imageUrls = [
-                `https://drive.google.com/uc?export=view&id=${id}`,
-                `https://lh3.googleusercontent.com/d/${id}`
-            ];
+            // Extract ID from different URL formats
+            let id = null;
+            let imageUrls = [];
+            
+            if (dataPoint.file_url) {
+                // Google Drive format: extract ID
+                const driveMatch = dataPoint.file_url.match(/id=([^&]+)/);
+                if (driveMatch) {
+                    id = driveMatch[1];
+                    imageUrls = [
+                        `https://drive.google.com/uc?export=view&id=${id}`,
+                        `https://lh3.googleusercontent.com/d/${id}`
+                    ];
+                } else {
+                    // Direct image URL
+                    imageUrls = [dataPoint.file_url];
+                }
+            }
             
             const analysisContent = document.getElementById('analysis-content');
-            analysisContent.innerHTML = `
+            
+            // Build content dynamically based on available data
+            let cardContent = `
                 <div class="data-card">
-                    <div class="image-container">
-                        <div class="image-loading">
-                            <div class="loading-spinner"></div>
-                            <div>Loading image...</div>
+                    ${imageUrls.length > 0 ? `
+                        <div class="image-container">
+                            <div class="image-loading">
+                                <div class="loading-spinner"></div>
+                                <div>Loading image...</div>
+                            </div>
+                            <img class="data-image" 
+                                 style="opacity: 0;"
+                                 alt="Data point visualization">
                         </div>
-                        <img class="data-image" 
-                             style="opacity: 0;"
-                             alt="Data point visualization">
-                    </div>
+                    ` : ''}
                     <div class="card-content">
                         <div class="cluster-badge">Cluster ${dataPoint.cluster}</div>
-                        <div class="text-content">${dataPoint.text_associato || 'No text content available'}</div>
-                        <div class="description">${dataPoint.description || 'No description available'}</div>
-                        <a href="${dataPoint.url_file}" target="_blank" class="action-button">
-                            View Original Image
-                        </a>
+            `;
+            
+            // Add text content if available
+            if (dataPoint.text) {
+                cardContent += `<div class="text-content">${dataPoint.text}</div>`;
+            }
+            
+            // Add description if available
+            if (dataPoint.description) {
+                cardContent += `<div class="description">${dataPoint.description}</div>`;
+            }
+            
+            // Add action button if URL is available
+            if (dataPoint.file_url) {
+                cardContent += `
+                    <a href="${dataPoint.file_url}" target="_blank" class="action-button">
+                        View Original Image
+                    </a>
+                `;
+            }
+            
+            cardContent += `
                     </div>
                 </div>
             `;
             
-            // Get the image element and loading indicator
-            const imgElement = analysisContent.querySelector('.data-image');
-            const loadingElement = analysisContent.querySelector('.image-loading');
-            const imageContainer = analysisContent.querySelector('.image-container');
+            analysisContent.innerHTML = cardContent;
             
-            let currentUrlIndex = 0;
-            
-            function tryLoadImage() {
-                if (currentUrlIndex >= imageUrls.length) {
-                    // All URLs failed, show error
-                    loadingElement.style.display = 'none';
-                    imageContainer.innerHTML += `
-                        <div class="image-error">
-                            <div class="error-icon">🖼️</div>
-                            <div>Image not available</div>
-                        </div>
-                    `;
-                    return;
+            // Handle image loading if we have image URLs
+            if (imageUrls.length > 0) {
+                const imgElement = analysisContent.querySelector('.data-image');
+                const loadingElement = analysisContent.querySelector('.image-loading');
+                const imageContainer = analysisContent.querySelector('.image-container');
+                
+                let currentUrlIndex = 0;
+                
+                function tryLoadImage() {
+                    if (currentUrlIndex >= imageUrls.length) {
+                        // All URLs failed, show error
+                        loadingElement.style.display = 'none';
+                        imageContainer.innerHTML += `
+                            <div class="image-error">
+                                <div class="error-icon">🖼️</div>
+                                <div>Image not available</div>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    imgElement.onload = function() {
+                        // Image loaded successfully
+                        loadingElement.style.display = 'none';
+                        imgElement.style.opacity = '1';
+                    };
+                    
+                    imgElement.onerror = function() {
+                        // Current URL failed, try next one
+                        currentUrlIndex++;
+                        if (currentUrlIndex < imageUrls.length) {
+                            imgElement.src = imageUrls[currentUrlIndex];
+                        } else {
+                            tryLoadImage(); // This will show the error message
+                        }
+                    };
+                    
+                    // Start loading the image
+                    imgElement.src = imageUrls[currentUrlIndex];
                 }
                 
-                imgElement.onload = function() {
-                    // Image loaded successfully
-                    loadingElement.style.display = 'none';
-                    imgElement.style.opacity = '1';
-                };
-                
-                imgElement.onerror = function() {
-                    // Current URL failed, try next one
-                    currentUrlIndex++;
-                    if (currentUrlIndex < imageUrls.length) {
-                        imgElement.src = imageUrls[currentUrlIndex];
-                    } else {
-                        tryLoadImage(); // This will show the error message
-                    }
-                };
-                
-                // Start loading the image
-                imgElement.src = imageUrls[currentUrlIndex];
+                // Start the loading process
+                tryLoadImage();
             }
-            
-            // Start the loading process
-            tryLoadImage();
         }
         
         // Function to toggle cluster visibility
@@ -1336,3 +1417,4 @@
     </script>
 </body>
 </html>
+                
