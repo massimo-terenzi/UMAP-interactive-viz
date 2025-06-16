@@ -2,6 +2,12 @@
 
 An interactive web tool for exploring UMAP (Uniform Manifold Approximation and Projection) results with advanced clustering and data analysis features. This tool provides an interactive web interface for visualizing clustered datasets reduced via UMAP, using .csv files that include coordinate data, image URLs, associated texts, and optional descriptions. It is designed to support the qualitative inspection of results from unsupervised clustering workflows, particularly in contexts where semantic and visual patterns are central to the analysis.
 
+If you use this script in your research, please cite it as:
+
+Terenzi, M. (2025). *UMAP Interactive Visualization Tool* (Version 1.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.15678501
+
+[![DOI](https://zenodo.org/badge/1000430412.svg)](https://doi.org/10.5281/zenodo.15678501)
+
 The tool is available here: [https://massimo-terenzi.github.io/UMAP-interactive-viz](https://massimo-terenzi.github.io/UMAP-interactive-viz/)
 
 ## ✨ Key Features
